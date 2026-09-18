@@ -1,0 +1,82 @@
+.TH TOKDUMP 1 "September 2026" "tokdump" "User Commands"
+.SH NAME
+tokdump \- dump tokens (like hexdump, for tokens)
+.SH SYNOPSIS
+.B tokdump
+[\fIfile\fR ...]
+.br
+.B tokdump
+[\fB\-h\fR | \fB\-\-help\fR]
+.br
+.B tokdump
+[\fB\-v\fR | \fB\-\-version\fR]
+.SH DESCRIPTION
+.B tokdump
+dumps token IDs for files or standard input using OpenAI's
+.B o200k_base
+encoding (the encoding used by GPT\-4o and related models), in a classic
+three\-column hexdump\-C style layout.
+.PP
+With no files,
+.B tokdump
+reads standard input and dumps tokens.
+With one or more files, it dumps each file; with more than one file, it prints
+a header line
+.BI tokdump: " FILENAME" :
+before each dump.
+.PP
+Unreadable files produce an error on stderr, other files continue, and
+the exit status is non\-zero if any file failed.
+.SH OUTPUT FORMAT
+Each dump line has:
+.TP
+.B Offset
+Token index as 7 lowercase hex digits.
+.TP
+.B Token IDs
+Exactly 4 per row (last row may have fewer), each right\-aligned in width 7.
+.TP
+.B Text column
+Starts at column 52. Spaces become
+.BR · ,
+newlines become
+.BR ↵ ,
+and other non\-printables become
+.BR . .
+.PP
+After all tokens, a trailing line prints the next offset alone.
+Empty input prints only
+.BR 0000000 .
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Print usage and exit 0.
+.TP
+.BR \-v ", " \-\-version
+Print version
+.RB ( "tokdump <version>" )
+and exit 0.
+.SH EXAMPLES
+.TP
+Dump tokens from stdin:
+.B echo \-n "Hello world" | tokdump
+.TP
+Dump tokens in one file:
+.B tokdump README.md
+.TP
+Dump tokens in multiple files:
+.B tokdump a.txt b.txt
+.SH ENCODING
+v1 always uses
+.BR o200k_base .
+A future
+.B \-e
+/
+.B \-\-encoding
+flag may select other encodings.
+.SH SEE ALSO
+.BR hexdump (1),
+.BR od (1),
+.BR tc (1)
+.SH AUTHOR
+Omar Bohsali

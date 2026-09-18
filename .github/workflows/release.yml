@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries and archives
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+          mkdir -p dist
+          for pair in \
+            linux/amd64 \
+            linux/arm64 \
+            darwin/amd64 \
+            darwin/arm64 \
+            windows/amd64 \
+            windows/arm64
+          do
+            GOOS=${pair%/*}
+            GOARCH=${pair#*/}
+            ext=""
+            binname="tokdump"
+            if [ "$GOOS" = "windows" ]; then
+              ext=".exe"
+              binname="tokdump.exe"
+            fi
+            raw="dist/tokdump_${GOOS}_${GOARCH}${ext}"
+            echo "building $raw (version=$VERSION)"
+            GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 \
+              go build -trimpath -ldflags="$LDFLAGS" -o "$raw" .
+
+            # Archive for Homebrew / package managers
+            stage=$(mktemp -d)
+            cp "$raw" "$stage/$binname"
+            if [ "$GOOS" = "windows" ]; then
+              archive="dist/tokdump_${VERSION}_${GOOS}_${GOARCH}.zip"
+              (cd "$stage" && zip -q "$OLDPWD/$archive" "$binname")
+            else
+              archive="dist/tokdump_${VERSION}_${GOOS}_${GOARCH}.tar.gz"
+              tar -C "$stage" -czf "$archive" "$binname"
+            fi
+            rm -rf "$stage"
+            echo "packed $archive"
+          done
+
+          (cd dist && sha256sum * > SHA256SUMS)
+          ls -la dist
+          echo "--- SHA256SUMS ---"
+          cat dist/SHA256SUMS
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

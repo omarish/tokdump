@@ -1,0 +1,6 @@
+/tokdump
+*.exe
+.DS_Store
+dist/
+mockup/
+media
