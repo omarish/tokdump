@@ -4,3 +4,6 @@
 dist/
 mockup/
 media
+
+mockup.png
+*.png
