@@ -17,7 +17,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-const usage = `Usage: tokdump [file ...]
+const usage = `Usage: tokdump [options] [file ...]
        tokdump -h | --help
        tokdump -v | --version
 
@@ -31,35 +31,43 @@ header line before each file's dump.
 Options:
   -h, --help      show this help
   -v, --version   print version and exit
+  -x, --hex       print token IDs in hexadecimal (default is decimal)
 
 Examples:
   echo -n "Hello world" | tokdump
+  echo -n "Hello world" | tokdump -x
   tokdump README.md
-  tokdump a.txt b.txt
-  cat notes.txt | tokdump
+  tokdump -x a.txt b.txt
 
 Encoding is always o200k_base in v1. A future -e/--encoding flag may
-select other encodings; for now there are no dump options.
+select other encodings.
 `
+
+type options struct {
+	files   []string
+	help    bool
+	version bool
+	hex     bool
+}
 
 // run implements the hexdump-like CLI. Separated from main for testing.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	files, help, showVersion, err := parseArgs(args)
+	opts, err := parseArgs(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "tokdump: %v\n", err)
 		return 1
 	}
-	if help {
+	if opts.help {
 		fmt.Fprint(stdout, usage)
 		return 0
 	}
-	if showVersion {
+	if opts.version {
 		fmt.Fprintf(stdout, "tokdump %s\n", version)
 		return 0
 	}
 
-	if len(files) == 0 {
-		if err := dumpReader(stdin, stdout); err != nil {
+	if len(opts.files) == 0 {
+		if err := dumpReader(stdin, stdout, opts.hex); err != nil {
 			fmt.Fprintf(stderr, "tokdump: %v\n", err)
 			return 1
 		}
@@ -67,12 +75,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	var failed bool
-	multi := len(files) > 1
-	for _, name := range files {
+	multi := len(opts.files) > 1
+	for _, name := range opts.files {
 		if multi {
 			fmt.Fprintf(stdout, "tokdump: %s:\n", name)
 		}
-		if err := dumpFile(name, stdout); err != nil {
+		if err := dumpFile(name, stdout, opts.hex); err != nil {
 			fmt.Fprintf(stderr, "tokdump: %s: %s\n", name, errString(err))
 			failed = true
 			continue
@@ -85,28 +93,35 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// parseArgs splits CLI args into file paths.
-// -h / --help requests usage. -v / --version requests version.
+// parseArgs splits CLI args into options and file paths.
+// -h / --help, -v / --version, -x / --hex.
 // -- ends option parsing.
-// Any other dash-led token is an error (so typos are not treated as filenames).
-func parseArgs(args []string) (files []string, help, showVersion bool, err error) {
+func parseArgs(args []string) (options, error) {
+	var opts options
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
-			return append(files, args[i+1:]...), false, false, nil
+			opts.files = append(opts.files, args[i+1:]...)
+			return opts, nil
 		}
 		if a == "-h" || a == "--help" {
-			return nil, true, false, nil
+			opts.help = true
+			return opts, nil
 		}
 		if a == "-v" || a == "--version" {
-			return nil, false, true, nil
+			opts.version = true
+			return opts, nil
+		}
+		if a == "-x" || a == "--hex" {
+			opts.hex = true
+			continue
 		}
 		if strings.HasPrefix(a, "-") && a != "-" {
-			return nil, false, false, fmt.Errorf("unknown option %s\nTry 'tokdump -h' for help.", a)
+			return options{}, fmt.Errorf("unknown option %s\nTry 'tokdump -h' for help.", a)
 		}
-		files = append(files, a)
+		opts.files = append(opts.files, a)
 	}
-	return files, false, false, nil
+	return opts, nil
 }
 
 func errString(err error) string {
@@ -116,16 +131,16 @@ func errString(err error) string {
 	return err.Error()
 }
 
-func dumpFile(name string, stdout io.Writer) error {
+func dumpFile(name string, stdout io.Writer, hexIDs bool) error {
 	f, err := os.Open(name)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	return dumpReader(f, stdout)
+	return dumpReader(f, stdout, hexIDs)
 }
 
-func dumpReader(r io.Reader, stdout io.Writer) error {
+func dumpReader(r io.Reader, stdout io.Writer, hexIDs bool) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
@@ -134,7 +149,7 @@ func dumpReader(r io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return formatDump(stdout, ids, pieces)
+	return formatDump(stdout, ids, pieces, hexIDs)
 }
 
 const (
@@ -144,7 +159,7 @@ const (
 )
 
 // formatDump writes classic hexdump-C-style token dump lines.
-func formatDump(w io.Writer, ids []int, pieces []string) error {
+func formatDump(w io.Writer, ids []int, pieces []string, hexIDs bool) error {
 	n := len(ids)
 	if n == 0 {
 		_, err := fmt.Fprintf(w, "%07x\n", 0)
@@ -156,7 +171,7 @@ func formatDump(w io.Writer, ids []int, pieces []string) error {
 		if end > n {
 			end = n
 		}
-		if err := writeDumpLine(w, i, ids[i:end], pieces[i:end]); err != nil {
+		if err := writeDumpLine(w, i, ids[i:end], pieces[i:end], hexIDs); err != nil {
 			return err
 		}
 	}
@@ -165,7 +180,7 @@ func formatDump(w io.Writer, ids []int, pieces []string) error {
 	return err
 }
 
-func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string) error {
+func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string, hexIDs bool) error {
 	var b strings.Builder
 	b.Grow(textCol + 64)
 
@@ -174,7 +189,11 @@ func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string) error {
 
 	// ID block: always reserve idsPerRow * idFieldWidth characters.
 	for _, id := range ids {
-		fmt.Fprintf(&b, "%*d", idFieldWidth, id)
+		if hexIDs {
+			fmt.Fprintf(&b, "%*x", idFieldWidth, id)
+		} else {
+			fmt.Fprintf(&b, "%*d", idFieldWidth, id)
+		}
 	}
 	remaining := (idsPerRow - len(ids)) * idFieldWidth
 	if remaining > 0 {
@@ -207,7 +226,6 @@ func displayToken(s string) string {
 	for len(s) > 0 {
 		r, size := utf8.DecodeRuneInString(s)
 		if r == utf8.RuneError && size == 1 {
-			// Invalid UTF-8 byte → '.'
 			b.WriteByte('.')
 			s = s[1:]
 			continue

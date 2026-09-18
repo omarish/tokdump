@@ -95,6 +95,8 @@ make build
 sudo mv tokdump /usr/local/bin/
 ```
 
+Token IDs print in **decimal** by default. Pass `-x` / `--hex` for hexadecimal (hexdump-style).
+
 ## Usage
 
 ```bash

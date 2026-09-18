@@ -11,7 +11,7 @@ import (
 
 // goldenDump builds expected dump output from the locked format rules
 // (same layout as formatDump / writeDumpLine).
-func goldenDump(ids []int, pieces []string) string {
+func goldenDump(ids []int, pieces []string, hexIDs bool) string {
 	var b strings.Builder
 	n := len(ids)
 	if n == 0 {
@@ -28,7 +28,11 @@ func goldenDump(ids []int, pieces []string) string {
 		var line strings.Builder
 		fmt.Fprintf(&line, "%07x  ", i)
 		for _, id := range rowIDs {
-			fmt.Fprintf(&line, "%*d", idFieldWidth, id)
+			if hexIDs {
+				fmt.Fprintf(&line, "%*x", idFieldWidth, id)
+			} else {
+				fmt.Fprintf(&line, "%*d", idFieldWidth, id)
+			}
 		}
 		remaining := (idsPerRow - len(rowIDs)) * idFieldWidth
 		line.WriteString(strings.Repeat(" ", remaining))
@@ -49,10 +53,10 @@ func TestFormatHelloWorld(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := formatDump(&out, ids, pieces); err != nil {
+	if err := formatDump(&out, ids, pieces, false); err != nil {
 		t.Fatal(err)
 	}
-	want := goldenDump(ids, pieces)
+	want := goldenDump(ids, pieces, false)
 	if out.String() != want {
 		t.Fatalf("format mismatch\ngot:\n%q\nwant:\n%q\n--- got ---\n%s--- want ---\n%s",
 			out.String(), want, out.String(), want)
@@ -72,7 +76,7 @@ func TestFormatHelloWorld(t *testing.T) {
 
 func TestFormatEmpty(t *testing.T) {
 	var out bytes.Buffer
-	if err := formatDump(&out, nil, nil); err != nil {
+	if err := formatDump(&out, nil, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "0000000\n" {
@@ -86,7 +90,7 @@ func TestFormatNewline(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := formatDump(&out, ids, pieces); err != nil {
+	if err := formatDump(&out, ids, pieces, false); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "↵") {
@@ -112,7 +116,7 @@ func TestRunStdinHelloWorld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := goldenDump(ids, pieces)
+	want := goldenDump(ids, pieces, false)
 	if out.String() != want {
 		t.Fatalf("stdout =\n%q\nwant\n%q", out.String(), want)
 	}
@@ -189,7 +193,7 @@ func TestRunDoubleDashFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := goldenDump(ids, pieces)
+	want := goldenDump(ids, pieces, false)
 	if out.String() != want {
 		t.Fatalf("stdout =\n%q\nwant\n%q", out.String(), want)
 	}
@@ -265,5 +269,46 @@ func TestRunEmptyStdin(t *testing.T) {
 	}
 	if out.String() != "0000000\n" {
 		t.Fatalf("empty stdin = %q", out.String())
+	}
+}
+
+
+func TestFormatHelloWorldHex(t *testing.T) {
+	ids, pieces, err := tokenize("Hello world")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := formatDump(&out, ids, pieces, true); err != nil {
+		t.Fatal(err)
+	}
+	want := goldenDump(ids, pieces, true)
+	if out.String() != want {
+		t.Fatalf("hex format mismatch\ngot:\n%q\nwant:\n%q\n%s", out.String(), want, out.String())
+	}
+	// 13225 = 0x33a9, 2375 = 0x947
+	exact := "0000000" + "  " +
+		fmt.Sprintf("%7x", 13225) + fmt.Sprintf("%7x", 2375) +
+		strings.Repeat(" ", 2*idFieldWidth)
+	for len(exact) < textCol-1 {
+		exact += " "
+	}
+	exact += "Hello·world\n0000002\n"
+	if out.String() != exact {
+		t.Fatalf("exact hex golden mismatch\ngot:\n%q\nwant:\n%q\n%s", out.String(), exact, out.String())
+	}
+}
+
+func TestRunHexFlag(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	code := run([]string{"-x"}, strings.NewReader("Hello world"), &out, &errBuf)
+	if code != 0 {
+		t.Fatalf("exit %d stderr %q", code, errBuf.String())
+	}
+	if !strings.Contains(out.String(), "33a9") {
+		t.Fatalf("expected hex id 33a9 in output: %q", out.String())
+	}
+	if strings.Contains(out.String(), "13225") {
+		t.Fatalf("decimal id should not appear with -x: %q", out.String())
 	}
 }
