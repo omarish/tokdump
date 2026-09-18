@@ -211,13 +211,18 @@ func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string, hexIDs b
 	return err
 }
 
-// formatText concatenates token pieces with hexdump-style substitutions.
+// formatText joins token pieces with "|" so variable-length tokens stay
+// visually separable when they contain no spaces (e.g. hex hash fragments).
+// Within each piece, space/newline/non-printables still use · / ↵ / .
 func formatText(pieces []string) string {
-	var b strings.Builder
-	for _, p := range pieces {
-		b.WriteString(displayToken(p))
+	if len(pieces) == 0 {
+		return ""
 	}
-	return b.String()
+	parts := make([]string, len(pieces))
+	for i, p := range pieces {
+		parts[i] = displayToken(p)
+	}
+	return strings.Join(parts, "|")
 }
 
 // displayToken renders a single token piece for the text column.

@@ -68,7 +68,7 @@ func TestFormatHelloWorld(t *testing.T) {
 	for len(exact) < textCol-1 {
 		exact += " "
 	}
-	exact += "Hello·world\n0000002\n"
+	exact += "Hello|·world\n0000002\n"
 	if out.String() != exact {
 		t.Fatalf("exact golden mismatch\ngot:\n%q\nwant:\n%q\nvisible got:\n%s", out.String(), exact, out.String())
 	}
@@ -293,7 +293,7 @@ func TestFormatHelloWorldHex(t *testing.T) {
 	for len(exact) < textCol-1 {
 		exact += " "
 	}
-	exact += "Hello·world\n0000002\n"
+	exact += "Hello|·world\n0000002\n"
 	if out.String() != exact {
 		t.Fatalf("exact hex golden mismatch\ngot:\n%q\nwant:\n%q\n%s", out.String(), exact, out.String())
 	}

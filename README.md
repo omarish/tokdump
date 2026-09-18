@@ -122,3 +122,6 @@ tokdump -v
 ## License
 
 MIT © 2026 Omar Bohsali
+
+
+Text-column tokens are separated with `|` (e.g. `37|01|c9|f2`).
