@@ -27,3 +27,53 @@ jobs:
           ./tokdump -v | grep -q 'tokdump '
           ./tokdump --version | grep -qx 'tokdump dev'
           echo -n hello | ./tokdump | grep -q '0000000'
+
+      - name: Smoke - invisible characters are visible
+        run: |
+          set -euo pipefail
+          # The whole point of the text column: a zero-width space must not
+          # be indistinguishable from a control byte.
+          printf 'ab​cd' | ./tokdump | grep -q '\\u200b'
+          printf 'a|b' | ./tokdump | grep -q '\\|'
+          printf 'a\tb' | ./tokdump | grep -q '\\t'
+
+      - name: Smoke - invalid UTF-8 warns but still dumps
+        run: |
+          set -euo pipefail
+          printf 'ok \xf0\x9f\x91' > bad.txt
+          ./tokdump bad.txt 2>/dev/null | grep -q '0000000'
+          ./tokdump bad.txt 2>&1 >/dev/null | grep -q 'not valid UTF-8'
+          if ./tokdump --strict bad.txt; then echo "--strict should have failed"; exit 1; fi
+
+  # Verifies the committed testdata/expected.json still matches what the real
+  # OpenAI tokenizer says. This is the job that catches tiktoken changing under
+  # us, or someone hand-editing the golden file.
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install reference tokenizer
+        run: pip install --quiet tiktoken
+
+      - name: Reference tokenizer version
+        run: python -c "import tiktoken; print('tiktoken', tiktoken.__version__)"
+
+      - name: Golden file still matches tiktoken
+        run: python scripts/gen_expected.py --check
+
+      - name: tokdump matches the golden file
+        run: go test -run TestConformance -v ./...
+
+      - name: Rendered dump golden is current
+        run: |
+          go test -run TestDumpGolden ./...
+          git diff --exit-code testdata/dump_golden.txt

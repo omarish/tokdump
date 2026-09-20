@@ -1,0 +1,395 @@
+{
+  "encoding": "o200k_base",
+  "cases": [
+    {
+      "name": "empty",
+      "note": "no input at all",
+      "text": ""
+    },
+    {
+      "name": "ascii-hello",
+      "note": "single token",
+      "text": "hello"
+    },
+    {
+      "name": "ascii-sentence",
+      "note": "ordinary prose",
+      "text": "The quick brown fox jumps over the lazy dog."
+    },
+    {
+      "name": "leading-space",
+      "note": "leading space merges into the token",
+      "text": " hello"
+    },
+    {
+      "name": "repeated-spaces",
+      "note": "long space run, BPE merges",
+      "text": "a                                        b"
+    },
+    {
+      "name": "tabs-newlines",
+      "note": "mixed whitespace incl. CRLF",
+      "text": "a\tb\nc\r\nd"
+    },
+    {
+      "name": "nul-and-controls",
+      "note": "C0 controls, valid UTF-8",
+      "text": "a\u0000b\u0001c\u001fd"
+    },
+    {
+      "name": "only-newlines",
+      "note": "newline run",
+      "text": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+    },
+    {
+      "name": "cjk-japanese",
+      "note": "CJK, multi-byte per char",
+      "text": "日本語のテキスト"
+    },
+    {
+      "name": "cjk-chinese",
+      "note": "CJK",
+      "text": "中文测试文本内容"
+    },
+    {
+      "name": "korean-hangul",
+      "note": "Hangul syllables",
+      "text": "한국어 텍스트입니다"
+    },
+    {
+      "name": "arabic-rtl",
+      "note": "RTL script",
+      "text": "مرحبا بالعالم"
+    },
+    {
+      "name": "hebrew-rtl",
+      "note": "RTL script",
+      "text": "שלום עולם"
+    },
+    {
+      "name": "thai-no-spaces",
+      "note": "no word separators",
+      "text": "ภาษาไทยไม่มีช่องว่าง"
+    },
+    {
+      "name": "devanagari",
+      "note": "combining vowel signs",
+      "text": "नमस्ते दुनिया"
+    },
+    {
+      "name": "greek-math",
+      "note": "symbols outside BMP-common range",
+      "text": "Ω≈ç√∫˜µ≤≥÷"
+    },
+    {
+      "name": "cyrillic",
+      "note": "Cyrillic",
+      "text": "Привет мир"
+    },
+    {
+      "name": "emoji-simple",
+      "note": "single astral-plane codepoint",
+      "text": "👍"
+    },
+    {
+      "name": "emoji-skin-tone",
+      "note": "base + skin tone modifier",
+      "text": "👋🏽"
+    },
+    {
+      "name": "emoji-zwj-family",
+      "note": "4 people joined by ZWJ, 11 tokens",
+      "text": "👨‍👩‍👧‍👦"
+    },
+    {
+      "name": "emoji-flag",
+      "note": "two regional indicators",
+      "text": "🇺🇸"
+    },
+    {
+      "name": "emoji-keycap",
+      "note": "digit + VS16 + combining keycap",
+      "text": "1️⃣"
+    },
+    {
+      "name": "emoji-run",
+      "note": "consecutive astral codepoints",
+      "text": "😀😃😄😁😆😅"
+    },
+    {
+      "name": "nfc-cafe",
+      "note": "precomposed e-acute",
+      "text": "café"
+    },
+    {
+      "name": "nfd-cafe",
+      "note": "decomposed: e + combining acute",
+      "text": "café"
+    },
+    {
+      "name": "zalgo",
+      "note": "stacked combining marks",
+      "text": "ă̴̢̐̕b"
+    },
+    {
+      "name": "ligature-ff",
+      "note": "U+FB00 LATIN SMALL LIGATURE FF",
+      "text": "ﬀ ligature"
+    },
+    {
+      "name": "fullwidth",
+      "note": "fullwidth Latin",
+      "text": "ｆｕｌｌｗｉｄｔｈ"
+    },
+    {
+      "name": "astral-math",
+      "note": "MATHEMATICAL DOUBLE-STRUCK SMALL L",
+      "text": "𝕝 example"
+    },
+    {
+      "name": "zwsp",
+      "note": "zero width space",
+      "text": "ab​cd"
+    },
+    {
+      "name": "zwj-zwnj",
+      "note": "zero width joiner / non-joiner",
+      "text": "a‍b‌c"
+    },
+    {
+      "name": "bidi-override",
+      "note": "RLO + PDF bidi override",
+      "text": "a‮evil‬b"
+    },
+    {
+      "name": "bidi-marks",
+      "note": "LRM / RLM",
+      "text": "a‎b‏c"
+    },
+    {
+      "name": "nbsp",
+      "note": "no-break space",
+      "text": "a b"
+    },
+    {
+      "name": "soft-hyphen",
+      "note": "soft hyphen",
+      "text": "auto­matic"
+    },
+    {
+      "name": "word-joiner",
+      "note": "word joiner",
+      "text": "a⁠b"
+    },
+    {
+      "name": "bom-leading",
+      "note": "BOM at start",
+      "text": "﻿hello"
+    },
+    {
+      "name": "bom-interior",
+      "note": "BOM mid-string",
+      "text": "a﻿b"
+    },
+    {
+      "name": "replacement-char-literal",
+      "note": "literal U+FFFD in valid input",
+      "text": "a��b"
+    },
+    {
+      "name": "noncharacter",
+      "note": "U+FFFE noncharacter",
+      "text": "a￾b"
+    },
+    {
+      "name": "private-use",
+      "note": "private use area",
+      "text": "ab"
+    },
+    {
+      "name": "max-codepoint",
+      "note": "U+10FFFF",
+      "text": "a􏿿b"
+    },
+    {
+      "name": "tag-characters",
+      "note": "TAG LATIN CAPITAL A, used in flag hacks",
+      "text": "a󠁁b"
+    },
+    {
+      "name": "special-endoftext",
+      "note": "must count as plain text, not a special token",
+      "text": "<|endoftext|>"
+    },
+    {
+      "name": "special-im-start",
+      "note": "ditto",
+      "text": "<|im_start|>system"
+    },
+    {
+      "name": "invalid-lone-continuation",
+      "note": "lone 0x80 between ASCII",
+      "hex": "618062"
+    },
+    {
+      "name": "invalid-two-continuations",
+      "note": "two lone continuations",
+      "hex": "61808062"
+    },
+    {
+      "name": "invalid-truncated-2byte",
+      "note": "truncated 2-byte sequence at EOF",
+      "hex": "78c3"
+    },
+    {
+      "name": "invalid-truncated-3byte",
+      "note": "truncated 3-byte CJK at EOF",
+      "hex": "78e697"
+    },
+    {
+      "name": "invalid-truncated-4byte",
+      "note": "truncated 4-byte emoji: Go gave 3 U+FFFD, tiktoken 1",
+      "hex": "6f6b20f09f91"
+    },
+    {
+      "name": "invalid-truncated-4byte-mid",
+      "note": "truncated 4-byte followed by ASCII",
+      "hex": "f09f9161"
+    },
+    {
+      "name": "invalid-overlong-nul",
+      "note": "overlong encoding of U+0000",
+      "hex": "c080"
+    },
+    {
+      "name": "invalid-overlong-3byte",
+      "note": "overlong 3-byte form",
+      "hex": "e08080"
+    },
+    {
+      "name": "invalid-surrogate",
+      "note": "UTF-16 high surrogate, CESU-8 style",
+      "hex": "eda0bd"
+    },
+    {
+      "name": "invalid-surrogate-pair",
+      "note": "full CESU-8 surrogate pair",
+      "hex": "eda0bdedb880"
+    },
+    {
+      "name": "invalid-f5",
+      "note": "lead byte past U+10FFFF",
+      "hex": "f5808080"
+    },
+    {
+      "name": "invalid-fe-ff",
+      "note": "never-valid bytes",
+      "hex": "feff"
+    },
+    {
+      "name": "invalid-c1",
+      "note": "overlong lead C1",
+      "hex": "c181"
+    },
+    {
+      "name": "invalid-latin1-text",
+      "note": "Latin-1 'cafe naive resume'",
+      "hex": "636166e9206e61ef76652072e973756de9"
+    },
+    {
+      "name": "invalid-utf16le",
+      "note": "'hello' as UTF-16LE",
+      "hex": "680065006c006c006f00"
+    },
+    {
+      "name": "invalid-utf16-bom",
+      "note": "UTF-16LE with BOM",
+      "hex": "fffe680065006c006c006f00"
+    },
+    {
+      "name": "invalid-all-continuations",
+      "note": "64 lone continuation bytes",
+      "hex": "80808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080"
+    },
+    {
+      "name": "invalid-long-run",
+      "note": "1000 invalid bytes, tests U+FFFD BPE merging",
+      "hex": "80808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080"
+    },
+    {
+      "name": "invalid-mixed-valid",
+      "note": "valid CJK + emoji interleaved with junk",
+      "hex": "61e697a580f09f918dff62"
+    },
+    {
+      "name": "invalid-binary-ish",
+      "note": "binary soup",
+      "hex": "000102fdfeff7f80c0c1f5f6f7f8f9fafbfc"
+    },
+    {
+      "name": "invalid-gzip-header",
+      "note": "a gzip magic header: a real accidental input",
+      "hex": "1f8b0800000000000003"
+    },
+    {
+      "name": "code-snippet",
+      "note": "Go source",
+      "text": "func main() {\n\tfmt.Println(\"hi\")\n}\n"
+    },
+    {
+      "name": "json-blob",
+      "note": "JSON with emoji",
+      "text": "{\"key\": \"value\", \"n\": 123, \"emoji\": \"🚀\"}"
+    },
+    {
+      "name": "markdown",
+      "note": "markdown",
+      "text": "# Title\n\n- item one\n- item two\n\n`code` and **bold**\n"
+    },
+    {
+      "name": "url",
+      "note": "URL",
+      "text": "https://example.com/path?a=1&b=2#frag"
+    },
+    {
+      "name": "mixed-scripts",
+      "note": "many scripts plus an invisible",
+      "text": "hello 世界 مرحبا 👋 ​ done"
+    },
+    {
+      "name": "blank-line-plain",
+      "note": "ordinary blank line; splits correctly",
+      "text": "a\n\nb"
+    },
+    {
+      "name": "blank-line-with-space",
+      "note": "blank line containing a space; upstream tiktoken-go splits this wrongly",
+      "text": "a\n \nb"
+    },
+    {
+      "name": "blank-line-with-tab",
+      "note": "blank line containing a tab; same upstream split bug",
+      "text": "a\n\t\nb"
+    },
+    {
+      "name": "blank-lines-whitespace-run",
+      "note": "20 whitespace-only blank lines; the upstream split bug compounds",
+      "text": "para\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \nend"
+    },
+    {
+      "name": "blank-line-crlf",
+      "note": "CRLF blank line",
+      "text": "a\r\n\r\nb"
+    },
+    {
+      "name": "trailing-space-newline",
+      "note": "trailing space before a newline",
+      "text": "a \nb"
+    },
+    {
+      "name": "markdown-hard-break",
+      "note": "two trailing spaces, a markdown hard break",
+      "text": "line one  \nline two"
+    }
+  ]
+}

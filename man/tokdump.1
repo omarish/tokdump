@@ -3,7 +3,7 @@
 tokdump \- dump tokens (like hexdump, for tokens)
 .SH SYNOPSIS
 .B tokdump
-[\fIfile\fR ...]
+[\fB\-x\fR] [\fB\-\-strict\fR] [\fIfile\fR ...]
 .br
 .B tokdump
 [\fB\-h\fR | \fB\-\-help\fR]
@@ -37,12 +37,38 @@ Token index as 7 lowercase hex digits.
 Exactly 4 per row (last row may have fewer), each right\-aligned in width 7.
 .TP
 .B Text column
-Starts at column 52. Spaces become
-.BR · ,
-newlines become
-.BR ↵ ,
-and other non\-printables become
-.BR . .
+Starts at column 52. Token pieces are separated by
+.BR | .
+.PP
+A token piece is a run of bytes, not necessarily a whole character: one emoji
+routinely spans several tokens. Anything that is not plainly readable is
+escaped rather than hidden, because the characters worth dumping are exactly
+the ones that render as nothing.
+.TP
+.B ·
+A space (U+00B7 MIDDLE DOT).
+.TP
+.B ↵
+A newline (U+21B5).
+.TP
+.BR \et ", " \er
+Tab, carriage return.
+.TP
+.BR \e\e ", " \e|
+A literal backslash, a literal pipe. Escaping the pipe keeps the piece
+separator unambiguous.
+.TP
+.B \exNN
+A control byte, or a byte belonging to a character that is split across this
+token boundary.
+.TP
+.BR \euXXXX ", " \eUXXXXXXXX
+A codepoint that renders as nothing: zero\-width space, zero\-width joiner,
+bidi control, BOM, soft hyphen, non\-break space, private use, unassigned.
+.TP
+.B ◌x
+A combining mark with no base character before it in the piece, shown on a
+dotted circle so it does not attach to the separator.
 .PP
 After all tokens, a trailing line prints the next offset alone.
 Empty input prints only
@@ -57,7 +83,27 @@ Print version.
 .TP
 .BR \-x ", " \-\-hex
 Print token IDs in hexadecimal instead of decimal.
-Print version
+.TP
+.B \-\-strict
+Treat input that is not valid UTF\-8 as an error instead of a warning.
+The offending input is not dumped and the exit status is non\-zero.
+.SH ENCODING OF INPUT
+Input is expected to be UTF\-8.
+.PP
+Input that is not valid UTF\-8 is still dumped, using the same substitution an
+API client would apply on the way out: each maximal invalid byte sequence
+becomes a single U+FFFD REPLACEMENT CHARACTER. This is the WHATWG rule, and it
+matches Python's
+.BR "bytes.decode(errors=\(dqreplace\(dq)" ,
+so the token IDs agree with the reference
+.B tiktoken
+implementation rather than with a naive per\-byte substitution.
+.PP
+When this happens
+.B tokdump
+writes a warning to stderr before the dump. Use
+.B \-\-strict
+to reject such input instead.
 .RB ( "tokdump <version>" )
 and exit 0.
 .SH EXAMPLES

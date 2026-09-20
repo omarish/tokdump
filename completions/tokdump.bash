@@ -7,7 +7,7 @@ _tokdump() {
 
   case "${cur}" in
     -*)
-      COMPREPLY=( $(compgen -W "-h --help -v --version" -- "${cur}") )
+      COMPREPLY=( $(compgen -W "-h --help -v --version -x --hex --strict" -- "${cur}") )
       return 0
       ;;
   esac

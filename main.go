@@ -32,10 +32,30 @@ Options:
   -h, --help      show this help
   -v, --version   print version and exit
   -x, --hex       print token IDs in hexadecimal (default is decimal)
+      --strict    fail on input that is not valid UTF-8
+
+Text column:
+  Token pieces are separated by |. A piece is a run of bytes, not
+  necessarily a whole character, so a character may span several tokens.
+  Anything not plainly readable is escaped rather than hidden:
+
+    ·  space          ↵  newline         \t \r  tab, carriage return
+    \\ \|             literal backslash, literal pipe
+    \xNN              a control byte, or a byte belonging to a character
+                      that is split across this token boundary
+    \uXXXX            a codepoint that would render as nothing: zero-width
+                      space, joiner, bidi control, BOM, soft hyphen
+    ◌x                a combining mark with no base character in the piece
+
+Input must be UTF-8. Input that is not valid UTF-8 is tokenized the way an
+API client would send it: each maximal invalid byte sequence becomes one
+U+FFFD. tokdump warns on stderr when this happens. Use --strict to reject
+such input instead.
 
 Examples:
   echo -n "Hello world" | tokdump
   echo -n "Hello world" | tokdump -x
+  printf 'a\u200bb' | tokdump      # reveals the zero-width space
   tokdump README.md
   tokdump -x a.txt b.txt
 
@@ -43,11 +63,15 @@ Encoding is always o200k_base in v1. A future -e/--encoding flag may
 select other encodings.
 `
 
+// stdinName is how standard input is named in diagnostics.
+const stdinName = "(standard input)"
+
 type options struct {
 	files   []string
 	help    bool
 	version bool
 	hex     bool
+	strict  bool
 }
 
 // run implements the hexdump-like CLI. Separated from main for testing.
@@ -67,7 +91,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if len(opts.files) == 0 {
-		if err := dumpReader(stdin, stdout, opts.hex); err != nil {
+		text, valid, err := readInput(stdin)
+		if err != nil {
+			fmt.Fprintf(stderr, "tokdump: %v\n", err)
+			return 1
+		}
+		// Warn before dumping, so the diagnostic is not buried under the dump.
+		if !valid {
+			reportInvalid(stderr, stdinName, opts.strict)
+			if opts.strict {
+				return 1
+			}
+		}
+		if err := dumpText(text, stdout, opts.hex); err != nil {
 			fmt.Fprintf(stderr, "tokdump: %v\n", err)
 			return 1
 		}
@@ -77,13 +113,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var failed bool
 	multi := len(opts.files) > 1
 	for _, name := range opts.files {
-		if multi {
-			fmt.Fprintf(stdout, "tokdump: %s:\n", name)
-		}
-		if err := dumpFile(name, stdout, opts.hex); err != nil {
+		text, valid, err := readFile(name)
+		if err != nil {
 			fmt.Fprintf(stderr, "tokdump: %s: %s\n", name, errString(err))
 			failed = true
 			continue
+		}
+		if !valid {
+			reportInvalid(stderr, name, opts.strict)
+			if opts.strict {
+				failed = true
+				continue
+			}
+		}
+		if multi {
+			fmt.Fprintf(stdout, "tokdump: %s:\n", name)
+		}
+		if err := dumpText(text, stdout, opts.hex); err != nil {
+			fmt.Fprintf(stderr, "tokdump: %s: %s\n", name, errString(err))
+			failed = true
 		}
 	}
 
@@ -93,8 +141,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// reportInvalid writes the diagnostic for input that is not valid UTF-8.
+// Under --strict it is an error; otherwise it is a warning and the dump
+// proceeds with U+FFFD substitution.
+func reportInvalid(stderr io.Writer, name string, strict bool) {
+	if strict {
+		fmt.Fprintf(stderr, "tokdump: %s: not valid UTF-8\n", name)
+		return
+	}
+	fmt.Fprintf(stderr, "tokdump: warning: %s: not valid UTF-8; dumped with U+FFFD substitution\n", name)
+}
+
 // parseArgs splits CLI args into options and file paths.
-// -h / --help, -v / --version, -x / --hex.
+// -h / --help, -v / --version, -x / --hex, --strict.
 // -- ends option parsing.
 func parseArgs(args []string) (options, error) {
 	var opts options
@@ -116,6 +175,10 @@ func parseArgs(args []string) (options, error) {
 			opts.hex = true
 			continue
 		}
+		if a == "--strict" {
+			opts.strict = true
+			continue
+		}
 		if strings.HasPrefix(a, "-") && a != "-" {
 			return options{}, fmt.Errorf("unknown option %s\nTry 'tokdump -h' for help.", a)
 		}
@@ -131,21 +194,30 @@ func errString(err error) string {
 	return err.Error()
 }
 
-func dumpFile(name string, stdout io.Writer, hexIDs bool) error {
+func readFile(name string) (text string, valid bool, err error) {
 	f, err := os.Open(name)
 	if err != nil {
-		return err
+		return "", false, err
 	}
 	defer f.Close()
-	return dumpReader(f, stdout, hexIDs)
+	return readInput(f)
 }
 
-func dumpReader(r io.Reader, stdout io.Writer, hexIDs bool) error {
+// readInput reads r and decodes it, reporting whether it was valid UTF-8.
+// Reading and dumping are separate so a warning can be emitted before the
+// dump it applies to.
+func readInput(r io.Reader) (text string, valid bool, err error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return err
+		return "", false, err
 	}
-	ids, pieces, err := tokenize(string(data))
+	text, valid = decodeUTF8(data)
+	return text, valid, nil
+}
+
+// dumpText tokenizes text and writes the dump.
+func dumpText(text string, stdout io.Writer, hexIDs bool) error {
+	ids, pieces, err := tokenize(text)
 	if err != nil {
 		return err
 	}
@@ -156,6 +228,7 @@ const (
 	idsPerRow    = 4
 	idFieldWidth = 7
 	textCol      = 52 // 1-based column where the text column starts
+	pieceSep     = '|'
 )
 
 // formatDump writes classic hexdump-C-style token dump lines.
@@ -213,7 +286,7 @@ func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string, hexIDs b
 
 // formatText joins token pieces with "|" so variable-length tokens stay
 // visually separable when they contain no spaces (e.g. hex hash fragments).
-// Within each piece, space/newline/non-printables still use · / ↵ / .
+// A literal "|" inside a piece is escaped, so the separator is unambiguous.
 func formatText(pieces []string) string {
 	if len(pieces) == 0 {
 		return ""
@@ -222,34 +295,102 @@ func formatText(pieces []string) string {
 	for i, p := range pieces {
 		parts[i] = displayToken(p)
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, string(pieceSep))
 }
 
 // displayToken renders a single token piece for the text column.
+//
+// A piece is a run of bytes, not necessarily a whole character: one
+// astral-plane emoji routinely spans several tokens, so a piece can begin or
+// end mid-character. Everything that is not plainly readable is escaped rather
+// than collapsed to ".", because the characters worth dumping are exactly the
+// ones that render as nothing.
+//
+//	\\ \|     literal backslash, literal pipe
+//	· ↵       space, newline
+//	\t \r     tab, carriage return
+//	\xNN      a control byte, or a byte of a character split across this
+//	          token boundary
+//	\uXXXX    a codepoint that renders as nothing: zero-width space, joiner,
+//	          bidi control, BOM, soft hyphen, non-break space, unassigned
+//	◌x        a combining mark with no base character before it in the piece
 func displayToken(s string) string {
 	var b strings.Builder
-	for len(s) > 0 {
-		r, size := utf8.DecodeRuneInString(s)
-		if r == utf8.RuneError && size == 1 {
-			b.WriteByte('.')
-			s = s[1:]
+	b.Grow(len(s))
+
+	// Tracks whether the last thing written was a literal character that a
+	// combining mark can safely attach to. Without this, a piece that starts
+	// with a combining mark puts the mark on the "|" separator.
+	hasBase := false
+
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size <= 1 {
+			// Not the start of a valid sequence. Expected here: it is how a
+			// character split across token boundaries shows up.
+			fmt.Fprintf(&b, `\x%02x`, s[i])
+			hasBase = false
+			i++
 			continue
 		}
-		s = s[size:]
-		switch r {
-		case ' ':
-			b.WriteRune('·') // U+00B7 MIDDLE DOT
-		case '\n':
-			b.WriteRune('↵') // U+21B5
-		case '\r', '\t':
-			b.WriteByte('.')
-		default:
-			if unicode.IsPrint(r) {
-				b.WriteRune(r)
-			} else {
-				b.WriteByte('.')
+		i += size
+
+		if isCombining(r) {
+			if !hasBase {
+				b.WriteRune('◌') // U+25CC DOTTED CIRCLE
 			}
+			b.WriteRune(r)
+			hasBase = true // further marks stack on this one
+			continue
 		}
+
+		out := displayRune(r)
+		b.WriteString(out)
+		// Only an unescaped literal is a usable base for a following mark.
+		hasBase = out == string(r)
 	}
 	return b.String()
+}
+
+// isCombining reports whether r is a mark that renders on top of the preceding
+// character. Spacing marks (Mc) advance the cursor, so they stand on their own.
+func isCombining(r rune) bool {
+	return unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r)
+}
+
+// displayRune renders one decoded codepoint.
+func displayRune(r rune) string {
+	switch r {
+	case '\\':
+		return `\\`
+	case pieceSep:
+		return `\|`
+	case ' ':
+		return "·" // U+00B7 MIDDLE DOT
+	case '\n':
+		return "↵" // U+21B5 DOWNWARDS ARROW WITH CORNER LEFTWARDS
+	case '\t':
+		return `\t`
+	case '\r':
+		return `\r`
+	}
+	switch {
+	case r < 0x20 || r == 0x7f:
+		// Remaining C0 controls and DEL, which arrive as single bytes.
+		return fmt.Sprintf(`\x%02x`, r)
+	case !unicode.IsPrint(r):
+		// Zero-width and bidi controls, BOM, soft hyphen, non-ASCII spaces,
+		// private use, unassigned. These are the ones worth naming: they are
+		// invisible, and being invisible is why someone opened tokdump.
+		return escapeRune(r)
+	default:
+		return string(r)
+	}
+}
+
+func escapeRune(r rune) string {
+	if r > 0xffff {
+		return fmt.Sprintf(`\U%08x`, r)
+	}
+	return fmt.Sprintf(`\u%04x`, r)
 }
