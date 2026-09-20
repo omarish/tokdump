@@ -7,3 +7,7 @@ media
 
 mockup.png
 *.png
+demo/*.gif
+demo/*.mp4
+demo/*.png
+demo/.*.gif

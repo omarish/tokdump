@@ -169,7 +169,7 @@ func TestDumpGolden(t *testing.T) {
 		if !valid {
 			fmt.Fprintf(&got, "--- input is not valid UTF-8\n")
 		}
-		if err := dumpText(text, &got, false); err != nil {
+		if err := dumpText(text, &got, false, newLayout(false)); err != nil {
 			t.Fatalf("%s: %v", c.Name, err)
 		}
 		got.WriteByte('\n')

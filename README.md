@@ -26,7 +26,20 @@ Each dump line:
 2. **Two spaces**
 3. **Token IDs** — exactly **4 per row** (last row may have fewer), each
    right-aligned in width 7
-4. **Text column** — starts at column 52; decoded token pieces separated by `|`
+4. **Text column** — starts one gutter past the reserved ID field, the way
+   `hexdump(1)` places its own: column 40 by default, column 26 with `-n`.
+   Decoded token pieces separated by `|`
+
+`-n` / `--narrow` halves the IDs per row and pulls the text column in with
+them, which keeps long dumps from wrapping in a split pane:
+
+```
+0000000    28823    101  \xf0\x9f\x91|\xa8
+0000002     2524  28823  \u200d|\xf0\x9f\x91
+0000004      102         \xa9
+0000005
+```
+
 
 ### Text column
 
@@ -54,11 +67,11 @@ Empty input prints only `0000000`.
 Example (`echo -n 'Hello world' | tokdump`):
 
 ```
-0000000    13225   2375                            Hello|·world
+0000000    13225   2375                Hello|·world
 0000002
 ```
 
-(IDs are width-7 right-aligned; the text column starts at column 52, with token
+(IDs are width-7 right-aligned; the text column starts at column 40, with token
 pieces separated by `|`.)
 
 With multiple files, each dump is preceded by `tokdump: FILENAME:`.
@@ -130,6 +143,9 @@ tokdump a.txt b.txt
 # hexadecimal token IDs
 tokdump -x a.txt
 
+# narrow layout for split panes: 2 IDs per row instead of 4
+tokdump -n a.txt
+
 # help / version
 tokdump -h
 tokdump -v
@@ -143,8 +159,8 @@ and all three are why a prompt is longer than you expected:
 
 ```
 $ printf 'a\u200bb\u202ec\u00add' | tokdump
-0000000       64   3310     65 152821              a|\u200b|b|\u202e
-0000004       66 130867                            c|\u00add
+0000000       64   3310     65 152821  a|\u200b|b|\u202e
+0000004       66 130867                c|\u00add
 0000006
 ```
 
@@ -153,8 +169,8 @@ exactly where the tokenizer cut:
 
 ```
 $ printf '\U0001F468\u200D\U0001F469' | tokdump
-0000000    28823    101   2524  28823              \xf0\x9f\x91|\xa8|\u200d|\xf0\x9f\x91
-0000004      102                                   \xa9
+0000000    28823    101   2524  28823  \xf0\x9f\x91|\xa8|\u200d|\xf0\x9f\x91
+0000004      102                       \xa9
 0000005
 ```
 
@@ -166,7 +182,7 @@ byte sequence becomes one U+FFFD, per the WHATWG rule that Python's
 ```
 $ printf 'ok \xf0\x9f\x91' | tokdump
 tokdump: warning: (standard input): not valid UTF-8; dumped with U+FFFD substitution
-0000000      525  28151                            ok|·�
+0000000      525  28151                ok|·�
 0000002
 ```
 

@@ -13,13 +13,14 @@ import (
 // goldenDump builds expected dump output from the locked format rules
 // (same layout as formatDump / writeDumpLine).
 func goldenDump(ids []int, pieces []string, hexIDs bool) string {
+	lay := newLayout(false)
 	var b strings.Builder
 	n := len(ids)
 	if n == 0 {
 		return "0000000\n"
 	}
-	for i := 0; i < n; i += idsPerRow {
-		end := i + idsPerRow
+	for i := 0; i < n; i += lay.idsPerRow {
+		end := i + lay.idsPerRow
 		if end > n {
 			end = n
 		}
@@ -35,9 +36,9 @@ func goldenDump(ids []int, pieces []string, hexIDs bool) string {
 				fmt.Fprintf(&line, "%*d", idFieldWidth, id)
 			}
 		}
-		remaining := (idsPerRow - len(rowIDs)) * idFieldWidth
+		remaining := (lay.idsPerRow - len(rowIDs)) * idFieldWidth
 		line.WriteString(strings.Repeat(" ", remaining))
-		for line.Len() < textCol-1 {
+		for line.Len() < lay.textCol-1 {
 			line.WriteByte(' ')
 		}
 		line.WriteString(formatText(rowPieces))
@@ -54,7 +55,7 @@ func TestFormatHelloWorld(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := formatDump(&out, ids, pieces, false); err != nil {
+	if err := formatDump(&out, ids, pieces, false, newLayout(false)); err != nil {
 		t.Fatal(err)
 	}
 	want := goldenDump(ids, pieces, false)
@@ -66,7 +67,7 @@ func TestFormatHelloWorld(t *testing.T) {
 	exact := "0000000" + "  " +
 		fmt.Sprintf("%7d", 13225) + fmt.Sprintf("%7d", 2375) +
 		strings.Repeat(" ", 2*idFieldWidth)
-	for len(exact) < textCol-1 {
+	for len(exact) < newLayout(false).textCol-1 {
 		exact += " "
 	}
 	exact += "Hello|·world\n0000002\n"
@@ -77,7 +78,7 @@ func TestFormatHelloWorld(t *testing.T) {
 
 func TestFormatEmpty(t *testing.T) {
 	var out bytes.Buffer
-	if err := formatDump(&out, nil, nil, false); err != nil {
+	if err := formatDump(&out, nil, nil, false, newLayout(false)); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "0000000\n" {
@@ -91,7 +92,7 @@ func TestFormatNewline(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := formatDump(&out, ids, pieces, false); err != nil {
+	if err := formatDump(&out, ids, pieces, false, newLayout(false)); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "↵") {
@@ -279,7 +280,7 @@ func TestFormatHelloWorldHex(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := formatDump(&out, ids, pieces, true); err != nil {
+	if err := formatDump(&out, ids, pieces, true, newLayout(false)); err != nil {
 		t.Fatal(err)
 	}
 	want := goldenDump(ids, pieces, true)
@@ -290,7 +291,7 @@ func TestFormatHelloWorldHex(t *testing.T) {
 	exact := "0000000" + "  " +
 		fmt.Sprintf("%7x", 13225) + fmt.Sprintf("%7x", 2375) +
 		strings.Repeat(" ", 2*idFieldWidth)
-	for len(exact) < textCol-1 {
+	for len(exact) < newLayout(false).textCol-1 {
 		exact += " "
 	}
 	exact += "Hello|·world\n0000002\n"
@@ -555,6 +556,71 @@ func TestHelpDocumentsEscapes(t *testing.T) {
 	for _, want := range []string{`\xNN`, `\uXXXX`, `\|`, "◌", "·", "↵", "--strict"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("help does not mention %q", want)
+		}
+	}
+}
+
+// Narrow mode halves the IDs per row and pulls the text column in with them.
+func TestNarrowLayout(t *testing.T) {
+	wide, narrow := newLayout(false), newLayout(true)
+	if wide.idsPerRow != 4 || narrow.idsPerRow != 2 {
+		t.Fatalf("idsPerRow: wide=%d narrow=%d, want 4 and 2", wide.idsPerRow, narrow.idsPerRow)
+	}
+	// textCol must sit exactly one gutter past the reserved ID field, the way
+	// hexdump places its text column.
+	for _, lay := range []layout{wide, narrow} {
+		want := offsetWidth + 2 + lay.idsPerRow*idFieldWidth + gutter + 1
+		if lay.textCol != want {
+			t.Errorf("idsPerRow=%d: textCol=%d, want %d", lay.idsPerRow, lay.textCol, want)
+		}
+	}
+	if narrow.textCol >= wide.textCol {
+		t.Errorf("narrow textCol %d should be less than wide %d", narrow.textCol, wide.textCol)
+	}
+}
+
+func TestRunNarrowFlag(t *testing.T) {
+	for _, arg := range []string{"-n", "--narrow"} {
+		var out, errBuf bytes.Buffer
+		if code := run([]string{arg}, strings.NewReader("Hello world"), &out, &errBuf); code != 0 {
+			t.Fatalf("%s: exit %d stderr %q", arg, code, errBuf.String())
+		}
+		lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+		// "Hello world" is 2 tokens, so narrow still fits them on one row.
+		if !strings.Contains(lines[0], "Hello|·world") {
+			t.Fatalf("%s: unexpected first line %q", arg, lines[0])
+		}
+		// Every rendered line must be shorter than the wide layout's text column.
+		var wideOut bytes.Buffer
+		run(nil, strings.NewReader("Hello world"), &wideOut, &errBuf)
+		if len(lines[0]) >= len(strings.Split(wideOut.String(), "\n")[0]) {
+			t.Errorf("%s: narrow line %q not shorter than wide", arg, lines[0])
+		}
+	}
+}
+
+// With more tokens than fit on one narrow row, the dump must split into more
+// rows while keeping offsets correct.
+func TestNarrowRowSplitting(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	if code := run([]string{"-n"}, strings.NewReader("one two three four five"), &out, &errBuf); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	for i, l := range lines[:len(lines)-1] {
+		want := fmt.Sprintf("%07x", i*2)
+		if !strings.HasPrefix(l, want) {
+			t.Errorf("line %d = %q, want offset prefix %s", i, l, want)
+		}
+	}
+}
+
+func TestHelpDocumentsNarrow(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	run([]string{"-h"}, strings.NewReader(""), &out, &errBuf)
+	for _, want := range []string{"-n, --narrow", "2 token IDs per row"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("help missing %q", want)
 		}
 	}
 }

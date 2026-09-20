@@ -32,6 +32,7 @@ Options:
   -h, --help      show this help
   -v, --version   print version and exit
   -x, --hex       print token IDs in hexadecimal (default is decimal)
+  -n, --narrow    2 token IDs per row instead of 4, for narrow terminals
       --strict    fail on input that is not valid UTF-8
 
 Text column:
@@ -71,6 +72,7 @@ type options struct {
 	help    bool
 	version bool
 	hex     bool
+	narrow  bool
 	strict  bool
 }
 
@@ -103,7 +105,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				return 1
 			}
 		}
-		if err := dumpText(text, stdout, opts.hex); err != nil {
+		if err := dumpText(text, stdout, opts.hex, newLayout(opts.narrow)); err != nil {
 			fmt.Fprintf(stderr, "tokdump: %v\n", err)
 			return 1
 		}
@@ -129,7 +131,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if multi {
 			fmt.Fprintf(stdout, "tokdump: %s:\n", name)
 		}
-		if err := dumpText(text, stdout, opts.hex); err != nil {
+		if err := dumpText(text, stdout, opts.hex, newLayout(opts.narrow)); err != nil {
 			fmt.Fprintf(stderr, "tokdump: %s: %s\n", name, errString(err))
 			failed = true
 		}
@@ -175,6 +177,10 @@ func parseArgs(args []string) (options, error) {
 			opts.hex = true
 			continue
 		}
+		if a == "-n" || a == "--narrow" {
+			opts.narrow = true
+			continue
+		}
 		if a == "--strict" {
 			opts.strict = true
 			continue
@@ -216,49 +222,72 @@ func readInput(r io.Reader) (text string, valid bool, err error) {
 }
 
 // dumpText tokenizes text and writes the dump.
-func dumpText(text string, stdout io.Writer, hexIDs bool) error {
+func dumpText(text string, stdout io.Writer, hexIDs bool, lay layout) error {
 	ids, pieces, err := tokenize(text)
 	if err != nil {
 		return err
 	}
-	return formatDump(stdout, ids, pieces, hexIDs)
+	return formatDump(stdout, ids, pieces, hexIDs, lay)
 }
 
 const (
-	idsPerRow    = 4
-	idFieldWidth = 7
-	textCol      = 52 // 1-based column where the text column starts
+	offsetWidth  = 7 // hex digits in the offset field
+	idFieldWidth = 7 // right-aligned width of one token ID
+	gutter       = 2 // blank columns between the ID field and the text column
 	pieceSep     = '|'
 )
 
+// layout is the column geometry of a dump. It follows hexdump(1): the offset,
+// two spaces, a fully reserved ID field that is padded when a row is short, then
+// the text column. hexdump also brackets its text column with "|", which tokdump
+// cannot do because "|" already separates token pieces, so the bracket is
+// dropped and the gutter is kept.
+type layout struct {
+	idsPerRow int
+	textCol   int // 1-based column where the text column starts
+}
+
+// newLayout returns the wide (default) or narrow geometry. Narrow halves the
+// IDs per row, which suits split panes and keeps long dumps from wrapping.
+func newLayout(narrow bool) layout {
+	n := 4
+	if narrow {
+		n = 2
+	}
+	return layout{
+		idsPerRow: n,
+		textCol:   offsetWidth + 2 + n*idFieldWidth + gutter + 1,
+	}
+}
+
 // formatDump writes classic hexdump-C-style token dump lines.
-func formatDump(w io.Writer, ids []int, pieces []string, hexIDs bool) error {
+func formatDump(w io.Writer, ids []int, pieces []string, hexIDs bool, lay layout) error {
 	n := len(ids)
 	if n == 0 {
-		_, err := fmt.Fprintf(w, "%07x\n", 0)
+		_, err := fmt.Fprintf(w, "%0*x\n", offsetWidth, 0)
 		return err
 	}
 
-	for i := 0; i < n; i += idsPerRow {
-		end := i + idsPerRow
+	for i := 0; i < n; i += lay.idsPerRow {
+		end := i + lay.idsPerRow
 		if end > n {
 			end = n
 		}
-		if err := writeDumpLine(w, i, ids[i:end], pieces[i:end], hexIDs); err != nil {
+		if err := writeDumpLine(w, i, ids[i:end], pieces[i:end], hexIDs, lay); err != nil {
 			return err
 		}
 	}
 	// Trailing line: next offset alone (hexdump habit).
-	_, err := fmt.Fprintf(w, "%07x\n", n)
+	_, err := fmt.Fprintf(w, "%0*x\n", offsetWidth, n)
 	return err
 }
 
-func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string, hexIDs bool) error {
+func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string, hexIDs bool, lay layout) error {
 	var b strings.Builder
-	b.Grow(textCol + 64)
+	b.Grow(lay.textCol + 64)
 
 	// Offset (7 hex digits) + two spaces.
-	fmt.Fprintf(&b, "%07x  ", offset)
+	fmt.Fprintf(&b, "%0*x  ", offsetWidth, offset)
 
 	// ID block: always reserve idsPerRow * idFieldWidth characters.
 	for _, id := range ids {
@@ -268,13 +297,13 @@ func writeDumpLine(w io.Writer, offset int, ids []int, pieces []string, hexIDs b
 			fmt.Fprintf(&b, "%*d", idFieldWidth, id)
 		}
 	}
-	remaining := (idsPerRow - len(ids)) * idFieldWidth
+	remaining := (lay.idsPerRow - len(ids)) * idFieldWidth
 	if remaining > 0 {
 		b.WriteString(strings.Repeat(" ", remaining))
 	}
 
 	// Pad so the text column starts at 1-based column textCol.
-	for b.Len() < textCol-1 {
+	for b.Len() < lay.textCol-1 {
 		b.WriteByte(' ')
 	}
 

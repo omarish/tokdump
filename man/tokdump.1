@@ -3,7 +3,7 @@
 tokdump \- dump tokens (like hexdump, for tokens)
 .SH SYNOPSIS
 .B tokdump
-[\fB\-x\fR] [\fB\-\-strict\fR] [\fIfile\fR ...]
+[\fB\-x\fR] [\fB\-n\fR] [\fB\-\-strict\fR] [\fIfile\fR ...]
 .br
 .B tokdump
 [\fB\-h\fR | \fB\-\-help\fR]
@@ -34,10 +34,17 @@ Each dump line has:
 Token index as 7 lowercase hex digits.
 .TP
 .B Token IDs
-Exactly 4 per row (last row may have fewer), each right\-aligned in width 7.
+Exactly 4 per row (2 with
+.BR \-n ),
+last row may have fewer, each right\-aligned in width 7. The field is reserved
+and padded when a row is short, so the text column stays aligned.
 .TP
 .B Text column
-Starts at column 52. Token pieces are separated by
+Starts one gutter past the reserved ID field, as in
+.BR hexdump (1):
+column 40 by default, column 26 with
+.BR \-n .
+Token pieces are separated by
 .BR | .
 .PP
 A token piece is a run of bytes, not necessarily a whole character: one emoji
@@ -83,6 +90,10 @@ Print version.
 .TP
 .BR \-x ", " \-\-hex
 Print token IDs in hexadecimal instead of decimal.
+.TP
+.BR \-n ", " \-\-narrow
+Print 2 token IDs per row instead of 4, and pull the text column in to match.
+Useful in split panes and narrow terminals.
 .TP
 .B \-\-strict
 Treat input that is not valid UTF\-8 as an error instead of a warning.
