@@ -461,23 +461,21 @@
 
 === blank-line-with-space
 --- blank line containing a space; upstream tiktoken-go splits this wrongly
-0000000       64    198    793     65              a|↵|·↵|b
-0000004
+0000000       64  47812     65                     a|↵·↵|b
+0000003
 
 === blank-line-with-tab
 --- blank line containing a tab; same upstream split bug
-0000000       64    198   2775     65              a|↵|\t↵|b
-0000004
+0000000       64  40612     65                     a|↵\t↵|b
+0000003
 
 === blank-lines-whitespace-run
 --- 20 whitespace-only blank lines; the upstream split bug compounds
-0000000    16151    198    793    793              para|↵|·↵|·↵
-0000004      793    793    793    793              ·↵|·↵|·↵|·↵
-0000008      793    793    793    793              ·↵|·↵|·↵|·↵
-000000c      793    793    793    793              ·↵|·↵|·↵|·↵
-0000010      793    793    793    793              ·↵|·↵|·↵|·↵
-0000014      793    793    419                     ·↵|·↵|end
-0000017
+0000000    16151  47812  56319  56319              para|↵·↵|·↵·↵|·↵·↵
+0000004    56319  56319  56319  56319              ·↵·↵|·↵·↵|·↵·↵|·↵·↵
+0000008    56319  56319  56319    793              ·↵·↵|·↵·↵|·↵·↵|·↵
+000000c      419                                   end
+000000d
 
 === blank-line-crlf
 --- CRLF blank line

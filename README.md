@@ -198,31 +198,6 @@ pip install tiktoken
 python scripts/gen_expected.py --check     # what CI does
 ```
 
-### Known upstream limitation
-
-Three corpus cases are skipped, and the skips are tripwires that fail if the
-cases start passing. `tiktoken-go` ships a code-generated regexp2 engine for
-the `o200k_base` split pattern, and that engine mishandles the `\s*[\r\n]+`
-alternative: a **blank line containing whitespace** splits into two pieces
-where the reference tokenizer produces one.
-
-```
-input        reference   here
-"a\n \nb"            3      4
-"a\n\t\nb"           3      4
-```
-
-It costs one extra token per whitespace-only blank line, so it compounds on
-text that has many of them. Ordinary blank lines, CRLF line endings, trailing
-spaces and markdown hard breaks are all unaffected — none of the 35 real files
-in these two repos hits it.
-
-The bug is in the generated engine, not the pattern: interpreting the identical
-pattern with `regexp2` directly gives the correct split. It is present in every
-`tiktoken-go` release through v0.8.1. `pkoukk/tiktoken-go` (with its offline
-loader, so still no network calls) tokenizes all three cases correctly and is
-the likely fix.
-
 ## Man page & completions
 
 - Man page: [`man/tokdump.1`](man/tokdump.1)

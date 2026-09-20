@@ -37,3 +37,8 @@ Unicode correctness (v0.2.0):
   `scripts/gen_expected.py`, plus a rendered-dump golden so text-column changes
   show up as a reviewable diff. `go test` runs offline; CI reruns the generator
   with `--check` to catch drift.
+- Tokenizer is `pkoukk/tiktoken-go` with its offline loader. The previous
+  library (`tiktoken-go/tokenizer`) ships a code-generated regexp2 engine that
+  mis-splits `\s*[\r\n]+`, costing one extra token per whitespace-only blank
+  line; the conformance corpus caught it and the swap fixed it. Binaries also
+  got smaller (17M -> 15M) and still make no network calls.
