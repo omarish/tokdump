@@ -5,6 +5,8 @@ Like hexdump, but for tokens.
 [![CI](https://github.com/omarish/tokdump/actions/workflows/ci.yml/badge.svg)](https://github.com/omarish/tokdump/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![tokdump dumping tokens](https://files.omarish.com/perm/projects/tokdump/tokdump-v0.3.0.svg)
+
 ## What it does
 
 `tokdump` dumps token IDs for files or stdin using OpenAI's **`o200k_base`**
@@ -40,7 +42,6 @@ them, which keeps long dumps from wrapping in a split pane:
 0000005
 ```
 
-
 ### Text column
 
 A token piece is a run of **bytes**, not necessarily a whole character — one
@@ -49,7 +50,7 @@ escaped rather than hidden, because the characters worth dumping are exactly
 the ones that render as nothing:
 
 | Rendering | Meaning |
-|---|---|
+| --- | --- |
 | `·` | space (U+00B7 middle dot) |
 | `↵` | newline (U+21B5) |
 | `\t` `\r` | tab, carriage return |
@@ -78,6 +79,18 @@ With multiple files, each dump is preceded by `tokdump: FILENAME:`.
 
 ## Install
 
+### Homebrew
+
+```bash
+brew install omarish/tap/tokdump
+```
+
+To upgrade an existing install:
+
+```bash
+brew update && brew upgrade tokdump
+```
+
 ### Prebuilt binaries
 
 Download the latest release for your OS/arch from:
@@ -91,7 +104,7 @@ Each release includes:
 - A `SHA256SUMS` file covering every asset (verify with `sha256sum -c SHA256SUMS`)
 
 | Platform | Binary | Archive |
-|---|---|---|
+| --- | --- | --- |
 | macOS Apple Silicon | [`tokdump_darwin_arm64`](https://github.com/omarish/tokdump/releases/latest/download/tokdump_darwin_arm64) | [`tokdump_*_darwin_arm64.tar.gz`](https://github.com/omarish/tokdump/releases/latest) |
 | macOS Intel | [`tokdump_darwin_amd64`](https://github.com/omarish/tokdump/releases/latest/download/tokdump_darwin_amd64) | [`tokdump_*_darwin_amd64.tar.gz`](https://github.com/omarish/tokdump/releases/latest) |
 | Linux x86_64 | [`tokdump_linux_amd64`](https://github.com/omarish/tokdump/releases/latest/download/tokdump_linux_amd64) | [`tokdump_*_linux_amd64.tar.gz`](https://github.com/omarish/tokdump/releases/latest) |
@@ -222,6 +235,5 @@ python scripts/gen_expected.py --check     # what CI does
 ## License
 
 MIT © 2026 Omar Bohsali
-
 
 Text-column tokens are separated with `|` (e.g. `37|01|c9|f2`).
